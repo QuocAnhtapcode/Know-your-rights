@@ -42,9 +42,25 @@ const WAGE_PROBLEM_PATTERNS: readonly RegExp[] = [
   /(?:lương\s*cuối|lương\s*sau\s*khi\s*nghỉ|final\s+pay)/iu,
 ];
 
+const WORKPLACE_VIOLENCE_PATTERNS: readonly RegExp[] = [
+  /(?:bị|đã\s*bị).{0,24}(?:chủ|sếp|quản\s*lý|giám\s*sát|đồng\s*nghiệp)?.{0,20}(?:đánh(?!\s*giá)(?:\s*đập)?|đấm|đá|tát|hành\s*hung|bạo\s*hành|tấn\s*công)/iu,
+  /(?:chủ|sếp|quản\s*lý|giám\s*sát|đồng\s*nghiệp).{0,36}(?:đánh(?!\s*giá)(?:\s*đập)?|đấm|đá|tát|hành\s*hung|bạo\s*hành|tấn\s*công|(?:đe\s*)?dọa(?:\s*(?:đánh|giết|làm\s*hại))?)/iu,
+  /(?:bạo\s*lực|hành\s*hung|tấn\s*công|đe\s*dọa\s*(?:đánh|giết|làm\s*hại)).{0,36}(?:nơi\s*làm\s*việc|chỗ\s*làm|công\s*ty|tôi)/iu,
+  /\b(?:my\s+)?(?:employer|boss|manager|supervisor|coworker|co-worker)\b.{0,48}\b(?:hits?|beat(?:en|ing)?|punch(?:ed|ing)?|kick(?:ed|ing)?|slap(?:ped|ping)?|assault(?:ed|ing)?|attack(?:ed|ing)?|threaten(?:ed|ing)?)(?:\s+me)?\b/iu,
+  /\b(?:i\s+(?:was|am|have\s+been)\s+)?(?:hit|beat(?:en|ing)?|punch(?:ed|ing)?|kick(?:ed|ing)?|slap(?:ped|ping)?|assault(?:ed|ing)?|attack(?:ed|ing)?|threaten(?:ed|ing)?)\b.{0,48}\b(?:at\s+work|by\s+(?:my\s+)?(?:employer|boss|manager|supervisor|coworker|co-worker))\b/iu,
+  /\b(?:workplace\s+violence|physical\s+assault|threatened\s+to\s+(?:hurt|kill)\s+me)\b/iu,
+];
+
 /** A narrow signal for reported wage-payment problems, not a legal conclusion. */
 export function hasExplicitWageProblem(text: string): boolean {
   return WAGE_PROBLEM_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/** A deterministic safety signal only; it does not decide whether an offence occurred. */
+export function hasExplicitWorkplaceViolence(text: string): boolean {
+  // "đánh giá" means evaluate, not hit; remove it before matching the verb "đánh".
+  const withoutEvaluationPhrase = text.replace(/đánh\s*giá/giu, '');
+  return WORKPLACE_VIOLENCE_PATTERNS.some((pattern) => pattern.test(withoutEvaluationPhrase));
 }
 
 export function inferGroups(text: string): SourceGroup[] {
@@ -63,6 +79,9 @@ export function inferGroups(text: string): SourceGroup[] {
     ['legal_help', /\b(?:legal help|lawyer|tư vấn|trợ giúp|support)\b/iu],
   ];
   const groups = rules.filter(([, pattern]) => pattern.test(text)).map(([group]) => group);
+  if (hasExplicitWorkplaceViolence(text)) {
+    groups.unshift('urgent_support', 'work_safety', 'legal_help');
+  }
   return groups.length > 0 ? [...new Set(groups)] : ['employment_general'];
 }
 

@@ -16,7 +16,7 @@ import {
   type PlannerDecision,
 } from './planner';
 
-export const ENGINE_VERSION = 'conversation-engine-v4.2' as const;
+export const ENGINE_VERSION = 'conversation-engine-v4.3' as const;
 const DEFAULT_MODEL = 'gpt-5.4-mini-2026-03-17';
 const PLANNER_TIMEOUT_MS = 25_000;
 const WEB_TIMEOUT_MS = 70_000;
@@ -109,8 +109,13 @@ function directAnswer(conversation: ConversationView, decision: PlannerDecision)
 
 function researchFallback(language: 'vi' | 'en', sourceGroups: readonly string[] = []): EngineAnswer {
   const isPayIssue = sourceGroups.includes('pay');
+  const isImmediateSafetyIssue = sourceGroups.includes('urgent_support');
   return {
-    text: isPayIssue
+    text: isImmediateSafetyIssue
+      ? language === 'en'
+        ? 'If you are in immediate danger, get to a safe place if you can and call 000. If you are injured, seek medical help. I could not retrieve approved-source evidence for the detailed guidance in this turn, so I will not make a legal conclusion. Open Help to find support services.'
+        : 'Nếu bạn đang gặp nguy hiểm ngay lúc này, hãy đến nơi an toàn nếu có thể và gọi 000. Nếu bị thương, hãy tìm trợ giúp y tế. Lượt này mình chưa lấy được bằng chứng từ nguồn đã duyệt cho phần hướng dẫn chi tiết nên sẽ không đưa ra kết luận pháp lý. Hãy mở Trợ giúp để xem các dịch vụ hỗ trợ.'
+      : isPayIssue
       ? language === 'en'
         ? 'I understand this is a pay problem, but I could not retrieve approved-source evidence for this turn. To look in the right place, was the whole pay period unpaid, was the amount short or deducted, was the payment late, or are you waiting for final pay after leaving? You do not need to name the person or workplace.'
         : 'Mình hiểu đây là vấn đề về tiền lương, nhưng lượt này chưa lấy được bằng chứng từ nguồn đã duyệt. Để mình tìm đúng hướng, bạn đang chưa được trả cả kỳ lương, bị trả thiếu hoặc khấu trừ, được trả chậm, hay chưa nhận lương cuối sau khi nghỉ việc? Bạn không cần nêu tên người hoặc nơi làm việc.'
@@ -134,6 +139,8 @@ function compactResearchInput(
     reported_issue: redactIdentifiers(latestUserMessage?.text ?? decision.standaloneQuestion),
     standalone_question: redactIdentifiers(decision.standaloneQuestion),
     search_query: redactIdentifiers(decision.searchQuery),
+    source_groups: decision.sourceGroups,
+    safety_priority: decision.sourceGroups.includes('urgent_support'),
     jurisdiction: decision.jurisdiction,
     user_reported_facts: facts,
     previous_evidence_ids: context.evidence.map((item) => item.id),
@@ -231,6 +238,8 @@ export class OfficialConversationEngine implements ConversationEngine {
           'Use at least one web search action and rely only on pages returned from the permitted domains. You may open a page or find text in a page when needed to verify the answer.',
           'Treat preferred_source_pages as starting hints only; they become evidence only after the web tool returns or opens them.',
           'Treat a short report of a workplace problem as a request for useful first steps, not as an incomplete search query.',
+          'When safety_priority is true, lead with immediate safety: if there is immediate danger in Australia, advise calling Triple Zero (000) and moving to a safe place if possible; advise seeking medical help for injury. Do not delay these steps behind employment-rights analysis.',
+          'For assault or threats, provide safety-first general information and practical support options without deciding that a particular crime, civil wrong or workplace-law breach occurred.',
           'When jurisdiction is UNKNOWN, give only Australia-wide general information that the national sources support, then ask one short jurisdiction clarification if it would materially change the next step.',
           'Write a concise answer in the requested language, distinguish general information from next steps, and state material uncertainty.',
           'Return one final output_text block. Add a native URL citation to every paragraph containing a legal or procedural claim, and ensure the final block contains at least one native citation.',

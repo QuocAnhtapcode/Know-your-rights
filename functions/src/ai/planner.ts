@@ -3,12 +3,13 @@ import { z } from 'zod';
 import type { ConversationView } from '../../../shared/contracts';
 import type { ConversationRecord } from '../session/repository';
 import {
-  activeJurisdiction, detectJurisdiction, hasExplicitWageProblem, inferGroups,
+  activeJurisdiction, detectJurisdiction, hasExplicitWageProblem,
+  hasExplicitWorkplaceViolence, inferGroups,
 } from '../sources/router';
 import { jurisdictionSchema, sourceGroupSchema, type Jurisdiction, type SourceGroup } from '../sources/registry';
 import { redactIdentifiers } from './context-builder';
 
-export const PLANNER_VERSION = 'planner-v4.2' as const;
+export const PLANNER_VERSION = 'planner-v4.3' as const;
 export const turnKindSchema = z.enum([
   'conversation', 'clarify', 'explain_previous', 'prepare_summary', 'research', 'urgent_support',
 ]);
@@ -106,6 +107,11 @@ function wageProblemSearchQuery(text: string): string | null {
   return 'Fair Work Ombudsman unpaid wages non-payment late pay Australia';
 }
 
+function workplaceViolenceSearchQuery(text: string): string | null {
+  if (!hasExplicitWorkplaceViolence(text)) return null;
+  return 'Australia workplace violence physical assault immediate safety worker support';
+}
+
 /** Adds only deterministic patches whose quote comes verbatim from the latest user message. */
 export function hardenPlannerDecision(decision: PlannerDecision, conversation: ConversationView): PlannerDecision {
   const latest = [...conversation.messages].reverse().find((message) => message.role === 'user');
@@ -120,12 +126,15 @@ export function hardenPlannerDecision(decision: PlannerDecision, conversation: C
   const contextualInferred = inferGroups(decision.standaloneQuestion);
   const explicitLatest = latestInferred.filter((group) => !GENERIC_SOURCE_GROUPS.has(group));
   const wageProblem = hasExplicitWageProblem(latest.text);
-  const sourceGroups = wageProblem
-    ? [...new Set([
-      ...explicitLatest,
-      ...decision.sourceGroups.filter((group) => PAY_COMPANION_GROUPS.has(group)),
-    ])].slice(0, 5)
-    : [...new Set([...explicitLatest, ...decision.sourceGroups, ...contextualInferred])].slice(0, 10);
+  const workplaceViolence = hasExplicitWorkplaceViolence(latest.text);
+  const sourceGroups = workplaceViolence
+    ? (['urgent_support', 'work_safety', 'legal_help'] satisfies SourceGroup[])
+    : wageProblem
+      ? [...new Set([
+        ...explicitLatest,
+        ...decision.sourceGroups.filter((group) => PAY_COMPANION_GROUPS.has(group)),
+      ])].slice(0, 5)
+      : [...new Set([...explicitLatest, ...decision.sourceGroups, ...contextualInferred])].slice(0, 10);
   const inferred = [...new Set([...latestInferred, ...contextualInferred])];
   const explicitLegalTopic = inferred.some((group) => ![
     'employment_general', 'legal_help', 'language_help',
@@ -139,7 +148,9 @@ export function hardenPlannerDecision(decision: PlannerDecision, conversation: C
     sourceGroups,
     // Jurisdiction is authority-bearing routing state: never accept a model guess.
     jurisdiction: detected?.jurisdiction ?? knownJurisdiction,
-    searchQuery: wageProblemSearchQuery(latest.text) ?? redactIdentifiers(decision.searchQuery).slice(0, 500),
+    searchQuery: workplaceViolenceSearchQuery(latest.text)
+      ?? wageProblemSearchQuery(latest.text)
+      ?? redactIdentifiers(decision.searchQuery).slice(0, 500),
     turnKind: forceResearch ? 'research' : decision.turnKind,
     needsNewEvidence: forceResearch,
     directReplyBlocks: forceResearch ? [] : decision.directReplyBlocks,

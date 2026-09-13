@@ -158,6 +158,6 @@ describe('Firebase-mode same-tab restore boundary', () => {
     expect(userMessage?.querySelector('h3')).toBeNull();
     expect(userMessage?.textContent).toContain('**hư cấu**');
     expect(container.querySelector('.message-assistant strong')?.textContent).toBe('Quyền lao động');
-    expect(screen.getByRole('link', { name: 'fairwork.gov.au' }).getAttribute('href')).toBe(sourceUrl);
+    expect(screen.getByRole('link', { name: 'fairwork.gov.au' }).getAttribute('href')).toBe('https://www.fairwork.gov.au/find-help-for/visa-holders-migrants');
   });
 });

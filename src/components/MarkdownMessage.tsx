@@ -11,11 +11,40 @@ const MARKDOWN_ELEMENTS = [
   'blockquote', 'pre', 'code', 'br', 'hr', 'a',
 ];
 
-function canonicalHttpsUrl(value: string | undefined): string | null {
+const TRACKING_QUERY_KEYS = new Set([
+  'fbclid',
+  'gclid',
+  'msclkid',
+]);
+
+/**
+ * OpenAI sometimes escapes Markdown punctuation even though the answer is
+ * plain Markdown. ReactMarkdown correctly treats those escapes as literal
+ * characters, which made `**bold**` and `[source](url)` appear unformatted.
+ *
+ * Only CommonMark presentation punctuation is restored. Angle brackets stay
+ * escaped, raw HTML remains disabled below, and every link still has to match
+ * the evidence ledger before it can become clickable.
+ */
+export function normalizeAssistantMarkdown(value: string): string {
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u200B\uFEFF]/gu, '')
+    .replace(/\\([!*_[\]()#.+-])/gu, '$1');
+}
+
+function safeEvidenceUrl(value: string | undefined): string | null {
   if (!value) return null;
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (key.toLowerCase().startsWith('utm_') || TRACKING_QUERY_KEYS.has(key.toLowerCase())) {
+        url.searchParams.delete(key);
+      }
+    }
+    url.searchParams.sort();
     return url.toString();
   } catch {
     return null;
@@ -30,9 +59,10 @@ function canonicalHttpsUrl(value: string | undefined): string | null {
 export function MarkdownMessage({ text, allowedUrls }: MarkdownMessageProps) {
   const approvedUrls = new Set(
     allowedUrls
-      .map((url) => canonicalHttpsUrl(url))
+      .map((url) => safeEvidenceUrl(url))
       .filter((url): url is string => url !== null),
   );
+  const markdown = normalizeAssistantMarkdown(text);
 
   return (
     <div className="message-markdown">
@@ -43,7 +73,7 @@ export function MarkdownMessage({ text, allowedUrls }: MarkdownMessageProps) {
           h1: ({ children }) => <h3>{children}</h3>,
           h2: ({ children }) => <h3>{children}</h3>,
           a: ({ href, children }) => {
-            const url = canonicalHttpsUrl(href);
+            const url = safeEvidenceUrl(href);
             if (!url || !approvedUrls.has(url)) {
               return <span className="markdown-link-blocked">{children}</span>;
             }
@@ -51,7 +81,7 @@ export function MarkdownMessage({ text, allowedUrls }: MarkdownMessageProps) {
           },
         }}
       >
-        {text}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
