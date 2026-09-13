@@ -9,3 +9,26 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 .language-toggle{border:1px solid #d8ded2;background:#f4f5ef;color:#49675a;border-radius:7px;padding:8px 9px;font-size:9px;font-weight:700;letter-spacing:.7px}.language-toggle:hover{background:#e9eee6}.summary-editor{display:block;width:100%;margin-top:18px;resize:vertical;border:1px solid #dce3d2;border-radius:8px;background:#fffefb;color:#53694b;font-size:11px;line-height:1.75;padding:12px;min-height:150px}.summary-editor:focus{border-color:#8ba57a}.summary-copy{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:10px;border-radius:7px;background:#385f45;color:#fff;padding:10px;font-size:10px;font-weight:600}
 @media(max-width:480px){.language-toggle{padding:7px;font-size:8px}.exit-button span{display:none}.context-tabs button{font-size:9px;gap:4px}.context-tabs button svg{width:13px}.chat-mobile-tools{flex-wrap:wrap}}
+
+/* Assistant answers use constrained Markdown; user messages remain pre-wrapped plain text. */
+.message-markdown{white-space:normal;line-height:1.8}
+.message-markdown>:first-child{margin-top:0}
+.message-markdown>:last-child{margin-bottom:0}
+.message-markdown p,.message-markdown ul,.message-markdown ol,.message-markdown blockquote,.message-markdown pre,.message-markdown hr{margin:0 0 12px}
+.message-markdown h1,.message-markdown h2,.message-markdown h3,.message-markdown h4,.message-markdown h5,.message-markdown h6{color:#385443;font-weight:650;line-height:1.45;margin:18px 0 8px;letter-spacing:-.15px}
+.message-markdown h1{font-size:1.35em}
+.message-markdown h2{font-size:1.25em}
+.message-markdown h3{font-size:1.16em}
+.message-markdown h4,.message-markdown h5,.message-markdown h6{font-size:1.05em}
+.message-markdown ul,.message-markdown ol{padding-left:1.55em}
+.message-markdown li{padding-left:.15em}
+.message-markdown li+li{margin-top:5px}
+.message-markdown li::marker{color:#6f8970;font-weight:650}
+.message-markdown strong{font-weight:700;color:#3c5847}
+.message-markdown a{color:#286449;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere}
+.message-markdown a:hover{color:#173f31}
+.message-markdown blockquote{border-left:3px solid #cbd8c2;padding:3px 0 3px 12px;color:#71816d}
+.message-markdown code{background:#edf1e8;border-radius:4px;padding:2px 4px;font-size:.92em}
+.message-markdown pre{overflow-x:auto;background:#edf1e8;border-radius:7px;padding:10px}
+.message-markdown pre code{padding:0}
+.markdown-link-blocked{color:inherit}

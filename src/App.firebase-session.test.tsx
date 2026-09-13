@@ -108,4 +108,56 @@ describe('Firebase-mode same-tab restore boundary', () => {
     expect(backend.getConversation).toHaveBeenCalledWith({ conversationId: pointer });
     expect(backend.startConversation).toHaveBeenCalledTimes(1);
   });
+
+  it('formats assistant Markdown but keeps user-authored Markdown literal', async () => {
+    const sourceUrl = 'https://www.fairwork.gov.au/find-help-for/visa-holders-migrants?utm_source=openai';
+    backend.sendMessage.mockImplementationOnce(async (request: {
+      conversationId: string;
+      message: string;
+      userMessageId: string;
+      attemptId: string;
+      contextVersion: number;
+    }) => {
+      const conversation = backend.state.conversation;
+      if (!conversation || conversation.conversationId !== request.conversationId) throw new Error('not found');
+      const createdAt = new Date().toISOString();
+      const sourceId = 'S02-synthetic';
+      conversation.messages.push(
+        { id: request.userMessageId, role: 'user', text: request.message, createdAt, sourceIds: [], provenance: 'user_reported' },
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          text: `### Trang nên xem trước\n\n- **Quyền lao động** áp dụng cho người giữ visa. ([fairwork.gov.au](${sourceUrl}))`,
+          createdAt,
+          sourceIds: [sourceId],
+          provenance: 'web_grounded',
+        },
+      );
+      conversation.evidenceLedger.push({
+        id: sourceId,
+        title: 'Fair Work Ombudsman',
+        url: sourceUrl,
+        retrievedAt: createdAt,
+        jurisdiction: 'AU',
+      });
+      conversation.contextVersion += 2;
+      return { mode: 'live' as const, status: 'completed' as const, attemptId: request.attemptId, conversation: structuredClone(conversation) };
+    });
+
+    const { container } = render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Bắt đầu trò chuyện' }));
+    await screen.findByRole('heading', { name: /Cuộc trò chuyện mới/ });
+
+    const userText = '### Câu hỏi **hư cấu**';
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tin nhắn của bạn' }), { target: { value: userText } });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi tin nhắn' }));
+
+    await screen.findByRole('heading', { level: 3, name: 'Trang nên xem trước' });
+    const userMessage = screen.getByText(userText).closest('.message-user');
+    expect(userMessage?.querySelector('h3')).toBeNull();
+    expect(userMessage?.textContent).toContain('**hư cấu**');
+    expect(container.querySelector('.message-assistant strong')?.textContent).toBe('Quyền lao động');
+    expect(screen.getByRole('link', { name: 'fairwork.gov.au' }).getAttribute('href')).toBe(sourceUrl);
+  });
 });

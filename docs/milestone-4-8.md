@@ -21,7 +21,7 @@ The Firebase v4 path is deployed at <https://know-your-rights-cd8b5.web.app>. It
 
 | Gate | Result |
 |---|---|
-| Typecheck/lint/unit/UI/build/bundle/secret scan | PASS — 12 files, 70 tests |
+| Typecheck/lint/unit/UI/build/bundle/secret scan | PASS — 13 files, 73 tests |
 | Auth/Firestore/Functions emulator suite | PASS — 2 files, 7 tests, `demo-*`, no OpenAI |
 | Firestore Rules compile/deploy | PASS — deny all browser access |
 | Functions deploy | PASS — four gen2 Node 22 callables ACTIVE in Sydney |

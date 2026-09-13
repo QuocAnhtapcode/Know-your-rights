@@ -70,7 +70,7 @@ To be filled only from command output from the final integration run:
 
 | Check | Actual | Status |
 |---|---|---|
-| `npm run check` | 12 test files / 70 tests; typecheck, lint, frontend/Functions build, bundle validation and secret scan all succeeded | PASS |
+| `npm run check` | 13 test files / 73 tests; typecheck, lint, frontend/Functions build, bundle validation and secret scan all succeeded | PASS |
 | `npm run test:emulator` | 2 files / 7 tests against isolated Auth/Firestore/Functions emulators; no OpenAI/cloud project access | PASS |
 | Firebase deploy | Hosting, Rules/indexes and four gen2 Node 22 callables deployed successfully to `know-your-rights-cd8b5`; all functions ACTIVE in `australia-southeast1` and report `cloud-live` | PASS |
 | Authorized OpenAI live smoke | 0 requests made by this integration run at document creation | NOT RUN |
