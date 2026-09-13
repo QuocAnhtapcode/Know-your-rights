@@ -203,7 +203,8 @@ describe('M4 official Responses adapter (network-free)', () => {
     expect(parse.mock.calls[0]![0]).not.toHaveProperty('tools');
     expect(create).toHaveBeenCalledTimes(1);
     const researchRequest = create.mock.calls[0]![0];
-    expect(researchRequest).toMatchObject({ store: false, max_tool_calls: 1, tool_choice: 'required' });
+    expect(researchRequest).toMatchObject({ store: false, max_tool_calls: 3, tool_choice: 'required' });
+    expect(researchRequest.tools[0].search_context_size).toBe('medium');
     expect(researchRequest.tools[0].filters.allowed_domains).toContain('www.fairwork.gov.au');
     expect(researchRequest.tools[0].filters.allowed_domains.length).toBeLessThan(29);
     expect(answer).toMatchObject({ provenance: 'web_grounded', text: expect.stringContaining('Fair Work') });

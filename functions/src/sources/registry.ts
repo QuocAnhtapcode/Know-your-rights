@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SOURCE_REGISTRY_VERSION = '2026-09-12.v4' as const;
+export const SOURCE_REGISTRY_VERSION = '2026-09-13.v4.1' as const;
 export const sourceIdSchema = z.enum([
   'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10',
   'S11', 'S12', 'S13', 'S14', 'S15', 'S16', 'S17', 'S18', 'S19', 'S20',
@@ -46,7 +46,7 @@ const source = (record: Omit<SourceRecord, 'reviewed_at' | 'owner_role'>): Sourc
 /** Versioned allowlist metadata only. This is not a claim that every page on a host was reviewed. */
 export const SOURCE_REGISTRY: readonly SourceRecord[] = [
   source({ id: 'S01', name: 'Rights of Migrant Workers in Community', canonical_host: 'migrants.org.au', allowed_hosts: ['migrants.org.au'], approved_paths: [], mode: 'search', role: 'community_legal_support', jurisdictions: ['NSW'], topics: ['employment_general', 'pay', 'payslips', 'visa', 'legal_help'], seed_urls: ['https://migrants.org.au/legal-help/'], review_status: 'page_read', notes: 'NSW migrant-worker support; never promise eligibility or response time.' }),
-  source({ id: 'S02', name: 'Fair Work Ombudsman', canonical_host: 'www.fairwork.gov.au', allowed_hosts: ['www.fairwork.gov.au'], approved_paths: [], mode: 'search', role: 'official_guidance', jurisdictions: ['AU_NATIONAL_SYSTEM'], topics: ['employment_general', 'pay', 'payslips', 'leave', 'super', 'dismissal'], seed_urls: ['https://www.fairwork.gov.au/tools-and-resources/language-help/vietnamese'], review_status: 'page_read', notes: 'Check coverage before individual conclusions.' }),
+  source({ id: 'S02', name: 'Fair Work Ombudsman', canonical_host: 'www.fairwork.gov.au', allowed_hosts: ['www.fairwork.gov.au'], approved_paths: [], mode: 'search', role: 'official_guidance', jurisdictions: ['AU_NATIONAL_SYSTEM'], topics: ['employment_general', 'pay', 'payslips', 'leave', 'super', 'dismissal'], seed_urls: ['https://www.fairwork.gov.au/tools-and-resources/language-help/vietnamese', 'https://www.fairwork.gov.au/pay-and-wages', 'https://www.fairwork.gov.au/workplace-problems/common-workplace-problems/my-pay-doesnt-seem-right', 'https://www.fairwork.gov.au/workplace-problems/fixing-a-workplace-problem/resolving-disputes-with-our-help'], review_status: 'page_read', notes: 'Check coverage before individual conclusions.' }),
   source({ id: 'S03', name: 'Fair Work Commission', canonical_host: 'www.fwc.gov.au', allowed_hosts: ['www.fwc.gov.au'], approved_paths: [], mode: 'search', role: 'official_guidance', jurisdictions: ['AU'], topics: ['dismissal', 'employment_general'], seed_urls: ['https://www.fwc.gov.au/apply-or-lodge/deadlines'], review_status: 'page_read', notes: 'Do not calculate a personal deadline without the event and procedure.' }),
   source({ id: 'S04', name: 'Department of Home Affairs', canonical_host: 'immi.homeaffairs.gov.au', allowed_hosts: ['immi.homeaffairs.gov.au'], approved_paths: [], mode: 'search', role: 'official_guidance', jurisdictions: ['AU'], topics: ['visa', 'employment_general'], seed_urls: ['https://immi.homeaffairs.gov.au/visas/employing-and-sponsoring-someone/migrant-worker-protections'], review_status: 'page_read', notes: 'No prediction of visa outcome or individual eligibility.' }),
   source({ id: 'S05', name: 'Australian Taxation Office', canonical_host: 'www.ato.gov.au', allowed_hosts: ['www.ato.gov.au'], approved_paths: [], mode: 'conditional_search', role: 'official_guidance', jurisdictions: ['AU'], topics: ['super'], seed_urls: ['https://www.ato.gov.au/calculators-and-tools/super-report-unpaid-super-contributions-from-my-employer'], review_status: 'indexed_only', notes: 'Runtime access was previously incomplete; never rely on snippets alone.' }),
@@ -81,4 +81,3 @@ if (SOURCE_REGISTRY.length !== 29 || new Set(SOURCE_REGISTRY.map((item) => item.
 }
 
 export const SOURCES_BY_ID = new Map<SourceId, SourceRecord>(SOURCE_REGISTRY.map((item) => [item.id, item]));
-

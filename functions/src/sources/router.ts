@@ -30,6 +30,23 @@ export function activeJurisdiction(conversation: ConversationView): Jurisdiction
     : 'UNKNOWN';
 }
 
+const PAY_TOPIC_PATTERN = /\b(?:pay|paid|wages?|salary|overtime|underpaid|underpayment|deductions?|final\s+pay)\b|(?:lương|tiền\s*công|tiền\s*tăng\s*ca|khấu\s*trừ)/iu;
+
+const WAGE_PROBLEM_PATTERNS: readonly RegExp[] = [
+  /\b(?:unpaid|withheld|withholding|held|non[-\s]?payment|late|missing|owed|underpaid|underpayment|short[-\s]?paid|deducted|deduction|final\s+pay)\b.{0,48}\b(?:pay|wages?|salary)\b/iu,
+  /\b(?:pay|wages?|salary)\b.{0,48}\b(?:unpaid|withheld|withholding|held|late|missing|owed|underpaid|short[-\s]?paid|deducted|not\s+paid)\b/iu,
+  /\b(?:underpaid|underpayment|short[-\s]?paid)\b/iu,
+  /\b(?:not|never)\s+(?:been\s+)?paid\b/iu,
+  /(?:giữ|giam|nợ|quỵt|không\s*(?:được\s*)?trả|chưa\s*(?:được\s*)?trả|trả\s*chậm|chậm\s*trả|trả\s*thiếu|thiếu|khấu\s*trừ).{0,36}(?:lương|tiền\s*công)/iu,
+  /(?:lương|tiền\s*công).{0,36}(?:bị\s*)?(?:giữ|giam|nợ|quỵt|không\s*được\s*trả|chưa\s*được\s*trả|trả\s*chậm|trả\s*thiếu|thiếu|khấu\s*trừ)/iu,
+  /(?:lương\s*cuối|lương\s*sau\s*khi\s*nghỉ|final\s+pay)/iu,
+];
+
+/** A narrow signal for reported wage-payment problems, not a legal conclusion. */
+export function hasExplicitWageProblem(text: string): boolean {
+  return WAGE_PROBLEM_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 export function inferGroups(text: string): SourceGroup[] {
   const rules: ReadonlyArray<[SourceGroup, RegExp]> = [
     ['payslips', /\b(?:payslip|pay slip|phiếu lương|bảng kê lương)\b/iu],
@@ -42,7 +59,7 @@ export function inferGroups(text: string): SourceGroup[] {
     ['housing', /\b(?:rent|tenant|housing|nhà ở|thuê nhà)\b/iu],
     ['privacy', /\b(?:privacy|riêng tư|camera|recording)\b/iu],
     ['leave', /\b(?:leave|nghỉ phép|sick day)\b/iu],
-    ['pay', /\b(?:pay|wage|salary|lương|overtime|tiền công)\b/iu],
+    ['pay', PAY_TOPIC_PATTERN],
     ['legal_help', /\b(?:legal help|lawyer|tư vấn|trợ giúp|support)\b/iu],
   ];
   const groups = rules.filter(([, pattern]) => pattern.test(text)).map(([group]) => group);
@@ -83,4 +100,3 @@ export function routeSources(
     allowedDomains: [...new Set(sources.flatMap((item) => item.allowed_hosts))],
   };
 }
-

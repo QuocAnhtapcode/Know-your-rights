@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ConversationView } from '../../../shared/contracts';
 import type { ConversationRecord } from '../session/repository';
-import { activeJurisdiction, detectJurisdiction, inferGroups } from '../sources/router';
+import {
+  activeJurisdiction, detectJurisdiction, hasExplicitWageProblem, inferGroups,
+} from '../sources/router';
 import { jurisdictionSchema, sourceGroupSchema, type Jurisdiction, type SourceGroup } from '../sources/registry';
 import { redactIdentifiers } from './context-builder';
 
-export const PLANNER_VERSION = 'planner-v4.1' as const;
+export const PLANNER_VERSION = 'planner-v4.2' as const;
 export const turnKindSchema = z.enum([
   'conversation', 'clarify', 'explain_previous', 'prepare_summary', 'research', 'urgent_support',
 ]);
@@ -88,6 +90,22 @@ function isSimpleDirectRequest(text: string): boolean {
   return /^(?:cảm ơn|thanks|thank you|ok|okay|nói (?:dễ hiểu|ngắn)|giải thích (?:dễ hiểu|ngắn)|viết (?:giúp|cho) tôi)/iu.test(text.trim());
 }
 
+const GENERIC_SOURCE_GROUPS = new Set<SourceGroup>(['employment_general', 'legal_help', 'language_help']);
+const PAY_COMPANION_GROUPS = new Set<SourceGroup>([
+  'pay', 'payslips', 'employment_general', 'legal_help', 'language_help',
+]);
+
+function wageProblemSearchQuery(text: string): string | null {
+  if (!hasExplicitWageProblem(text)) return null;
+  if (/\b(?:final\s+pay)\b|(?:lương\s*cuối|lương\s*sau\s*khi\s*nghỉ)/iu.test(text)) {
+    return 'Fair Work Ombudsman final pay unpaid wages Australia';
+  }
+  if (/\b(?:underpaid|underpayment|short[-\s]?paid|deducted|deduction)\b|(?:trả\s*thiếu|thiếu\s*lương|khấu\s*trừ)/iu.test(text)) {
+    return 'Fair Work Ombudsman underpayment wage deductions Australia';
+  }
+  return 'Fair Work Ombudsman unpaid wages non-payment late pay Australia';
+}
+
 /** Adds only deterministic patches whose quote comes verbatim from the latest user message. */
 export function hardenPlannerDecision(decision: PlannerDecision, conversation: ConversationView): PlannerDecision {
   const latest = [...conversation.messages].reverse().find((message) => message.role === 'user');
@@ -98,8 +116,17 @@ export function hardenPlannerDecision(decision: PlannerDecision, conversation: C
   if (detected && !factsPatch.some((patch) => patch.key === 'jurisdiction')) {
     factsPatch.push({ operation: 'upsert', key: 'jurisdiction', value: detected.jurisdiction, sourceMessageId: latest.id, quote: detected.quote });
   }
-  const inferred = inferGroups(`${latest.text} ${decision.standaloneQuestion}`);
-  const sourceGroups = [...new Set([...decision.sourceGroups, ...inferred])].slice(0, 10);
+  const latestInferred = inferGroups(latest.text);
+  const contextualInferred = inferGroups(decision.standaloneQuestion);
+  const explicitLatest = latestInferred.filter((group) => !GENERIC_SOURCE_GROUPS.has(group));
+  const wageProblem = hasExplicitWageProblem(latest.text);
+  const sourceGroups = wageProblem
+    ? [...new Set([
+      ...explicitLatest,
+      ...decision.sourceGroups.filter((group) => PAY_COMPANION_GROUPS.has(group)),
+    ])].slice(0, 5)
+    : [...new Set([...explicitLatest, ...decision.sourceGroups, ...contextualInferred])].slice(0, 10);
+  const inferred = [...new Set([...latestInferred, ...contextualInferred])];
   const explicitLegalTopic = inferred.some((group) => ![
     'employment_general', 'legal_help', 'language_help',
   ].includes(group));
@@ -112,7 +139,7 @@ export function hardenPlannerDecision(decision: PlannerDecision, conversation: C
     sourceGroups,
     // Jurisdiction is authority-bearing routing state: never accept a model guess.
     jurisdiction: detected?.jurisdiction ?? knownJurisdiction,
-    searchQuery: redactIdentifiers(decision.searchQuery).slice(0, 500),
+    searchQuery: wageProblemSearchQuery(latest.text) ?? redactIdentifiers(decision.searchQuery).slice(0, 500),
     turnKind: forceResearch ? 'research' : decision.turnKind,
     needsNewEvidence: forceResearch,
     directReplyBlocks: forceResearch ? [] : decision.directReplyBlocks,

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ConversationView } from '../../../shared/contracts';
 import type { SourceRecord } from '../sources/registry';
 
-export const CITATION_GATE_VERSION = 'citation-gate-v4.1' as const;
+export const CITATION_GATE_VERSION = 'citation-gate-v4.2' as const;
 
 const citationSchema = z.looseObject({
   type: z.literal('url_citation'),
@@ -19,6 +19,7 @@ const textBlockSchema = z.looseObject({
 });
 const messageSchema = z.looseObject({
   type: z.literal('message'), status: z.literal('completed'),
+  phase: z.enum(['commentary', 'final_answer']).nullable().optional(),
   content: z.array(z.unknown()).min(1).max(12),
 });
 const webCallSchema = z.looseObject({
@@ -102,6 +103,9 @@ export function gateResearchResponse(
     if (!item || typeof item !== 'object' || (item as Record<string, unknown>).type !== 'message') continue;
     const message = messageSchema.safeParse(item);
     if (!message.success) throw new CitationGateError('response_invalid');
+    // Reasoning models can emit an uncited commentary message before the cited final answer.
+    // Commentary is never returned to the user; phase-absent and final messages remain fail-closed.
+    if (message.data.phase === 'commentary') continue;
     for (const candidate of message.data.content) {
       if (!candidate || typeof candidate !== 'object' || (candidate as Record<string, unknown>).type !== 'output_text') continue;
       const block = textBlockSchema.safeParse(candidate);

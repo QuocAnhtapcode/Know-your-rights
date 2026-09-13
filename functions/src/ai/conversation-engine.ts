@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { ConversationView } from '../../../shared/contracts';
 import { CitationGateError, gateResearchResponse, validateDirectSourceIds } from '../security/citation-gate';
 import { activeJurisdiction, routeSources } from '../sources/router';
+import type { SourcePool } from '../sources/router';
 import type { ReplyProvider } from './provider';
 import { buildModelContext, redactIdentifiers } from './context-builder';
 import {
@@ -15,7 +16,7 @@ import {
   type PlannerDecision,
 } from './planner';
 
-export const ENGINE_VERSION = 'conversation-engine-v4.1' as const;
+export const ENGINE_VERSION = 'conversation-engine-v4.2' as const;
 const DEFAULT_MODEL = 'gpt-5.4-mini-2026-03-17';
 const PLANNER_TIMEOUT_MS = 25_000;
 const WEB_TIMEOUT_MS = 70_000;
@@ -106,25 +107,37 @@ function directAnswer(conversation: ConversationView, decision: PlannerDecision)
   };
 }
 
-function researchFallback(language: 'vi' | 'en'): EngineAnswer {
+function researchFallback(language: 'vi' | 'en', sourceGroups: readonly string[] = []): EngineAnswer {
+  const isPayIssue = sourceGroups.includes('pay');
   return {
-    text: language === 'en'
-      ? 'I could not verify this answer against the approved sources just now, so I will not guess. Please try again later or open Help to contact an official service.'
-      : 'Mình chưa xác minh được câu trả lời từ các nguồn đã duyệt nên sẽ không đoán. Bạn có thể thử lại sau hoặc mở Trợ giúp để liên hệ một dịch vụ chính thức.',
+    text: isPayIssue
+      ? language === 'en'
+        ? 'I understand this is a pay problem, but I could not retrieve approved-source evidence for this turn. To look in the right place, was the whole pay period unpaid, was the amount short or deducted, was the payment late, or are you waiting for final pay after leaving? You do not need to name the person or workplace.'
+        : 'Mình hiểu đây là vấn đề về tiền lương, nhưng lượt này chưa lấy được bằng chứng từ nguồn đã duyệt. Để mình tìm đúng hướng, bạn đang chưa được trả cả kỳ lương, bị trả thiếu hoặc khấu trừ, được trả chậm, hay chưa nhận lương cuối sau khi nghỉ việc? Bạn không cần nêu tên người hoặc nơi làm việc.'
+      : language === 'en'
+        ? 'I could not verify this answer against the approved sources just now, so I will not guess. Please try again later or open Help to contact an official service.'
+        : 'Mình chưa xác minh được câu trả lời từ các nguồn đã duyệt nên sẽ không đoán. Bạn có thể thử lại sau hoặc mở Trợ giúp để liên hệ một dịch vụ chính thức.',
     sourceIds: [], evidence: [], provenance: 'assistant_generated',
   };
 }
 
-function compactResearchInput(conversation: ConversationView, decision: PlannerDecision): string {
+function compactResearchInput(
+  conversation: ConversationView,
+  decision: PlannerDecision,
+  pool: SourcePool,
+): string {
   const context = buildModelContext(conversation, 6_000);
   const facts = context.userFacts.map((fact) => ({ key: fact.key, value: fact.value }));
+  const latestUserMessage = [...context.recentMessages].reverse().find((message) => message.role === 'user');
   return JSON.stringify({
     language: context.language,
+    reported_issue: redactIdentifiers(latestUserMessage?.text ?? decision.standaloneQuestion),
     standalone_question: redactIdentifiers(decision.standaloneQuestion),
     search_query: redactIdentifiers(decision.searchQuery),
     jurisdiction: decision.jurisdiction,
     user_reported_facts: facts,
     previous_evidence_ids: context.evidence.map((item) => item.id),
+    preferred_source_pages: [...new Set(pool.sources.flatMap((source) => source.seed_urls))].slice(0, 16),
   });
 }
 
@@ -192,15 +205,17 @@ export class OfficialConversationEngine implements ConversationEngine {
       ? decision.jurisdiction
       : activeJurisdiction(conversation);
     const pool = routeSources(decision.sourceGroups, jurisdiction);
-    if (pool.sources.length === 0 || pool.allowedDomains.length === 0) return researchFallback(conversation.conversationState.language);
+    if (pool.sources.length === 0 || pool.allowedDomains.length === 0) {
+      return researchFallback(conversation.conversationState.language, decision.sourceGroups);
+    }
     const startedAt = this.now();
     try {
       // The official REST API exposes max_tool_calls; SDK 7.15's stable REST type omits it.
-      const request: ResponseCreateParamsNonStreaming & { max_tool_calls: 1 } = {
+      const request: ResponseCreateParamsNonStreaming & { max_tool_calls: 3 } = {
         model: this.model,
         store: false,
         max_output_tokens: 1_200,
-        max_tool_calls: 1,
+        max_tool_calls: 3,
         parallel_tool_calls: false,
         reasoning: { effort: 'none' },
         include: ['web_search_call.action.sources'],
@@ -208,17 +223,20 @@ export class OfficialConversationEngine implements ConversationEngine {
           type: 'web_search',
           external_web_access: true,
           filters: { allowed_domains: pool.allowedDomains },
-          search_context_size: 'low',
+          search_context_size: 'medium',
         }],
         tool_choice: 'required',
         instructions: [
           'You are a careful worker-rights information assistant for Australia, not a lawyer or emergency service.',
-          'Use the web tool exactly once and rely only on pages returned from the permitted domains.',
-          'Write in the requested language, distinguish general information from next steps, and state uncertainty.',
-          'Every output_text block must contain at least one native URL citation supporting its legal or procedural claims.',
+          'Use at least one web search action and rely only on pages returned from the permitted domains. You may open a page or find text in a page when needed to verify the answer.',
+          'Treat preferred_source_pages as starting hints only; they become evidence only after the web tool returns or opens them.',
+          'Treat a short report of a workplace problem as a request for useful first steps, not as an incomplete search query.',
+          'When jurisdiction is UNKNOWN, give only Australia-wide general information that the national sources support, then ask one short jurisdiction clarification if it would materially change the next step.',
+          'Write a concise answer in the requested language, distinguish general information from next steps, and state material uncertainty.',
+          'Return one final output_text block. Add a native URL citation to every paragraph containing a legal or procedural claim, and ensure the final block contains at least one native citation.',
           'Do not request or repeat names, addresses, visa numbers, account details or other identifying data.',
         ].join(' '),
-        input: compactResearchInput(conversation, { ...decision, jurisdiction }),
+        input: compactResearchInput(conversation, { ...decision, jurisdiction }, pool),
       };
       const response = await this.client.responses.create(request, { maxRetries: 0, timeout: WEB_TIMEOUT_MS });
       const result = gateResearchResponse(response, pool.sources, this.model, jurisdiction, this.now());
@@ -234,7 +252,7 @@ export class OfficialConversationEngine implements ConversationEngine {
         status: error instanceof CitationGateError ? error.code : 'failed',
         latencyMs: Math.max(0, this.now() - startedAt),
       });
-      return researchFallback(conversation.conversationState.language);
+      return researchFallback(conversation.conversationState.language, decision.sourceGroups);
     }
   }
 }
