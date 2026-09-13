@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_CHAT_MODE: mock
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Use Node from .nvmrc
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Use Java 21 for Firebase Emulator Suite
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install pinned dependencies
+        run: npm run install:all
+      - name: Lint, typecheck, unit tests, builds and secret scan
+        run: npm run check
+      - name: Test callable Functions and deny-all Rules in isolated emulators
+        run: npm run test:emulator

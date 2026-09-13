@@ -1,0 +1,26 @@
+# Dependencies and generated builds
+node_modules/
+dist/
+functions/lib/
+coverage/
+.firebase/
+.tools/
+.tmp/
+
+# Local environment and credentials (only sanitized examples may be committed)
+.env
+.env.*
+!.env.example
+!.env.*.example
+.secret.local
+**/.secret.local
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*-adminsdk-*.json
+*.pem
+*.key
+
+# Tool logs
+*-debug.log
+*-debug.*.log
+*.tsbuildinfo

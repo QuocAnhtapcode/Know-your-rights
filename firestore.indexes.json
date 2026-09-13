@@ -1,0 +1,14 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "conversations", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "demoGrants", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "usageBuckets", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "messages", "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "userFacts", "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "conversationState", "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "evidenceLedger", "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "attempts", "indexes": [] },
+    { "collectionGroup": "conversations", "fieldPath": "activeAttempt", "indexes": [] }
+  ]
+}

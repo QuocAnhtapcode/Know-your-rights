@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Server-only MVP: even authenticated browser clients cannot access data.
+    // Admin SDK bypasses these rules; callable functions MUST validate ownership.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
